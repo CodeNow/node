@@ -365,7 +365,7 @@ int uv__socket(int domain, int type, int protocol) {
     goto out;
 
   if (uv__nonblock(sockfd, 1) || uv__cloexec(sockfd, 1)) {
-    close(sockfd);
+    uv__close(sockfd);
     sockfd = -1;
   }
 
@@ -421,7 +421,7 @@ skip:
     }
 
     if (uv__cloexec(peerfd, 1) || uv__nonblock(peerfd, 1)) {
-      close(peerfd);
+      uv__close(peerfd);
       peerfd = -1;
     }
 
@@ -431,6 +431,24 @@ skip:
   return peerfd;
 }
 
+int uv__close(int fd) {
+  int saved_errno;
+  int rc;
+
+  assert(fd > -1);  /* Catch uninitialized io_watcher.fd bugs. */
+  assert(fd > STDERR_FILENO);  /* Catch stdio close bugs. */
+
+  saved_errno = errno;
+  rc = close(fd);
+  if (rc == -1) {
+    rc = -errno;
+    if (rc == -EINTR)
+      rc = -EINPROGRESS;  /* For platform/libc consistency. */
+    errno = saved_errno;
+  }
+
+  return rc;
+}
 
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__APPLE__)
 
@@ -525,7 +543,7 @@ int uv__dup(int fd) {
     return -1;
 
   if (uv__cloexec(fd, 1)) {
-    SAVE_ERRNO(close(fd));
+    uv__close(fd);
     return -1;
   }
 

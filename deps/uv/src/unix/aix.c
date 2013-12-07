@@ -85,7 +85,7 @@ int uv_exepath(char* buffer, size_t* size) {
     return fd;
 
   res = read(fd, &ps, sizeof(ps));
-  close(fd);
+  uv__close(fd);
   if (res < 0)
     return res;
 
@@ -181,7 +181,7 @@ uv_err_t uv_resident_set_memory(size_t* rss) {
   else
     err = uv__new_sys_error(EINVAL);
 
-  close(fd);
+  uv__close(fd);
 
   return err;
 }
@@ -293,14 +293,14 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
   }
 
   if (ioctl(sockfd, SIOCGSIZIFCONF, &size) == -1) {
-    close(sockfd);
+    uv__close(sockfd);
     return uv__new_artificial_error(UV_ENOSYS);
   }
 
   ifc.ifc_req = (struct ifreq*)malloc(size);
   ifc.ifc_len = size;
   if (ioctl(sockfd, SIOCGIFCONF, &ifc) == -1) {
-    close(sockfd);
+    uv__close(sockfd);
     return uv__new_artificial_error(UV_ENOSYS);
   }
 
@@ -319,7 +319,7 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
 
     memcpy(flg.ifr_name, p->ifr_name, sizeof(flg.ifr_name));
     if (ioctl(sockfd, SIOCGIFFLAGS, &flg) == -1) {
-      close(sockfd);
+      uv__close(sockfd);
       return uv__new_artificial_error(UV_ENOSYS);
     }
 
@@ -333,7 +333,7 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
   *addresses = (uv_interface_address_t*)
     malloc(*count * sizeof(uv_interface_address_t));
   if (!(*addresses)) {
-    close(sockfd);
+    uv__close(sockfd);
     return uv__new_artificial_error(UV_ENOMEM);
   }
   address = *addresses;
@@ -350,7 +350,7 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
 
     memcpy(flg.ifr_name, p->ifr_name, sizeof(flg.ifr_name));
     if (ioctl(sockfd, SIOCGIFFLAGS, &flg) == -1) {
-      close(sockfd);
+      uv__close(sockfd);
       return uv__new_artificial_error(UV_ENOSYS);
     }
 
@@ -374,7 +374,7 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
 
 #undef ADDR_SIZE
 
-  close(sockfd);
+  uv__close(sockfd);
   return uv_ok_;
 }
 

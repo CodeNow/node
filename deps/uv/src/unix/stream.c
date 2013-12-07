@@ -296,7 +296,7 @@ int uv__stream_try_select(uv_stream_t* stream, int* fd) {
   timeout.tv_nsec = 1;
 
   ret = kevent(kq, filter, 1, events, 1, &timeout);
-  SAVE_ERRNO(close(kq));
+  uv__close(kq);
 
   if (ret == -1)
     return uv__set_sys_error(stream->loop, errno);
@@ -343,8 +343,8 @@ int uv__stream_try_select(uv_stream_t* stream, int* fd) {
   return 0;
 
 fatal4:
-  close(s->fake_fd);
-  close(s->int_fd);
+  uv__close(s->fake_fd);
+  uv__close(s->int_fd);
   s->fake_fd = -1;
   s->int_fd = -1;
 fatal3:
@@ -451,7 +451,7 @@ void uv__stream_destroy(uv_stream_t* stream) {
  * There is one caveat: it's not reliable in a multi-threaded environment.
  * The file descriptor limit is per process. Our party trick fails if another
  * thread opens a file or creates a socket in the time window between us
- * calling close() and accept().
+ * calling uv__close() and accept().
  */
 static int uv__emfile_trick(uv_loop_t* loop, int accept_fd) {
   int fd;
@@ -459,13 +459,13 @@ static int uv__emfile_trick(uv_loop_t* loop, int accept_fd) {
   if (loop->emfile_fd == -1)
     return -1;
 
-  close(loop->emfile_fd);
+  uv__close(loop->emfile_fd);
 
   for (;;) {
     fd = uv__accept(accept_fd);
 
     if (fd != -1) {
-      close(fd);
+      uv__close(fd);
       continue;
     }
 
@@ -576,7 +576,7 @@ int uv_accept(uv_stream_t* server, uv_stream_t* client) {
       if (uv__stream_open(streamClient, streamServer->accepted_fd,
             UV_STREAM_READABLE | UV_STREAM_WRITABLE)) {
         /* TODO handle error */
-        close(streamServer->accepted_fd);
+        uv__close(streamServer->accepted_fd);
         streamServer->accepted_fd = -1;
         goto out;
       }
@@ -584,7 +584,7 @@ int uv_accept(uv_stream_t* server, uv_stream_t* client) {
 
     case UV_UDP:
       if (uv_udp_open((uv_udp_t*) client, streamServer->accepted_fd)) {
-        close(streamServer->accepted_fd);
+        uv__close(streamServer->accepted_fd);
         streamServer->accepted_fd = -1;
         goto out;
       }
@@ -1374,8 +1374,8 @@ void uv__stream_close(uv_stream_t* handle) {
     uv_thread_join(&s->thread);
     uv_sem_destroy(&s->close_sem);
     uv_sem_destroy(&s->async_sem);
-    close(s->fake_fd);
-    close(s->int_fd);
+    uv__close(s->fake_fd);
+    uv__close(s->int_fd);
     uv_close((uv_handle_t*) &s->async, uv__stream_osx_cb_close);
 
     handle->select = NULL;
@@ -1386,11 +1386,15 @@ void uv__stream_close(uv_stream_t* handle) {
   uv_read_stop(handle);
   uv__handle_stop(handle);
 
-  close(handle->io_watcher.fd);
-  handle->io_watcher.fd = -1;
+  if (handle->io_watcher.fd != -1) {
+    /* Don't close stdio file descriptors.  Nothing good comes from it. */
+    if (handle->io_watcher.fd > STDERR_FILENO)
+      uv__close(handle->io_watcher.fd);
+    handle->io_watcher.fd = -1;
+  }
 
   if (handle->accepted_fd >= 0) {
-    close(handle->accepted_fd);
+    uv__close(handle->accepted_fd);
     handle->accepted_fd = -1;
   }
 

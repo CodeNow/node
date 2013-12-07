@@ -236,7 +236,7 @@ static int uv__process_open_stream(uv_stdio_container_t* container,
   if (!(container->flags & UV_CREATE_PIPE) || pipefds[0] < 0)
     return 0;
 
-  if (close(pipefds[1]))
+  if (uv__close(pipefds[1]))
     if (errno != EINTR && errno != EINPROGRESS)
       abort();
 
@@ -290,8 +290,10 @@ static void uv__process_child_init(uv_process_options_t options,
     close_fd = pipes[fd][0];
     use_fd = pipes[fd][1];
 
-    if (use_fd >= 0)
-      close(close_fd);
+    if (use_fd >= 0) {
+      if (close_fd != -1)
+        uv__close(close_fd);
+    }
     else if (fd >= 3)
       continue;
     else {
@@ -311,7 +313,7 @@ static void uv__process_child_init(uv_process_options_t options,
       uv__cloexec(use_fd, 0);
     else {
       dup2(use_fd, fd);
-      close(use_fd);
+      uv__close(use_fd);
     }
 
     if (fd <= 2)
@@ -415,8 +417,8 @@ int uv_spawn(uv_loop_t* loop,
   pid = fork();
 
   if (pid == -1) {
-    close(signal_pipe[0]);
-    close(signal_pipe[1]);
+    uv__close(signal_pipe[0]);
+    uv__close(signal_pipe[1]);
     goto error;
   }
 
@@ -425,7 +427,7 @@ int uv_spawn(uv_loop_t* loop,
     abort();
   }
 
-  close(signal_pipe[1]);
+  uv__close(signal_pipe[1]);
 
   process->errorno = 0;
   do
@@ -441,7 +443,7 @@ int uv_spawn(uv_loop_t* loop,
   else
     abort();
 
-  close(signal_pipe[0]);
+  uv__close(signal_pipe[0]);
 
   for (i = 0; i < options.stdio_count; i++) {
     if (uv__process_open_stream(options.stdio + i, pipes[i], i == 0)) {
@@ -469,9 +471,9 @@ error:
         if (options.stdio[i].flags & (UV_INHERIT_FD | UV_INHERIT_STREAM))
           continue;
       if (pipes[i][0] != -1)
-        close(pipes[i][0]);
+        uv__close(pipes[i][0]);
       if (pipes[i][1] != -1)
-        close(pipes[i][1]);
+        uv__close(pipes[i][1]);
     }
     free(pipes);
   }

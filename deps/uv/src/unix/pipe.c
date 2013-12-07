@@ -96,11 +96,11 @@ out:
   /* Clean up on error. */
   if (status) {
     if (bound) {
-      /* unlink() before close() to avoid races. */
+      /* unlink() before uv__close() to avoid races. */
       assert(pipe_fname != NULL);
       unlink(pipe_fname);
     }
-    close(sockfd);
+    uv__close(sockfd);
 
     free((void*)pipe_fname);
   }

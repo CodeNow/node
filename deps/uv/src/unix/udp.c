@@ -49,6 +49,10 @@ void uv__udp_close(uv_udp_t* handle) {
   uv__handle_stop(handle);
   close(handle->io_watcher.fd);
   handle->io_watcher.fd = -1;
+  if (handle->io_watcher.fd != -1) {
+    uv__close(handle->io_watcher.fd);
+    handle->io_watcher.fd = -1;
+  }
 }
 
 
@@ -376,7 +380,7 @@ static int uv__bind(uv_udp_t* handle,
 
 out:
   if (status) {
-    close(handle->io_watcher.fd);
+    uv__close(handle->io_watcher.fd);
     handle->io_watcher.fd = -1;
   }
 
